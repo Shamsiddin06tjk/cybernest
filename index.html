@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="CyberNest: 3D corridor for learning networks, Linux and Git, in Uzbek, Russian, Tajik and English.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>CyberNest</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: full-bleed 3D night corridor; floating top bar, bottom room rail, lesson panel slides in from the right (bottom sheet on phones). Single dark world by design. */
+:root{
+  --bg:#0b0d12; --surface:#131722; --surface-2:#1a1f2d; --line:#2a3144; --fg:#eef1f6; --muted:#9aa4b8;
+  --net:#4ea8ff; --linux:#f4b43c; --git:#ff6b4a; --ok:#4fd18b; --bad:#ff7d7d;
+  --wing:var(--net);
+  --f-display:"Unbounded","Rubik",system-ui,sans-serif;
+  --f-body:"Rubik",system-ui,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;overflow:hidden;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#scene:active{cursor:grabbing}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--wing);outline-offset:2px}
+
+/* top bar */
+.topbar{position:fixed;z-index:20;top:calc(env(safe-area-inset-top,0px) + 12px);
+  left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;pointer-events:none}
+.topbar>*{pointer-events:auto}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:.04em;
+  background:rgba(19,23,34,.82);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+.brand svg{flex:none}
+.prog{display:flex;align-items:center;gap:8px;font-family:var(--f-body);font-weight:500;font-size:12px;color:var(--muted);letter-spacing:0}
+.bar{width:64px;height:4px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--net),var(--linux),var(--git));transition:width .4s}
+.langs{display:flex;background:rgba(19,23,34,.82);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:3px}
+.langs button{border:0;background:none;padding:6px 10px;border-radius:9px;font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--muted);cursor:pointer}
+.langs button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+
+/* bottom rail */
+.rail{position:fixed;z-index:15;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
+  left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;justify-content:center;pointer-events:none}
+.rail-inner{display:flex;gap:14px;overflow-x:auto;max-width:100%;pointer-events:auto;
+  background:rgba(19,23,34,.82);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:14px;padding:8px 10px}
+.wgroup{display:flex;flex-direction:column;gap:4px;flex:none}
+.wgroup span{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);white-space:nowrap}
+.wgroup div{display:flex;gap:5px}
+.chip{position:relative;width:36px;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--surface-2);
+  font-family:var(--f-mono);font-size:12px;font-weight:600;cursor:pointer;display:grid;place-items:center;
+  font-variant-numeric:tabular-nums;transition:transform .15s,border-color .15s}
+.chip:hover{transform:translateY(-2px);border-color:var(--c)}
+.chip::before{content:"";position:absolute;top:4px;right:4px;width:5px;height:5px;border-radius:50%;background:var(--c)}
+.chip.done{background:var(--c);color:#0b0d12;border-color:var(--c)}
+.chip.done::before{display:none}
+.chip.here{outline:2px solid var(--c);outline-offset:2px}
+
+/* lesson panel */
+.panel{position:fixed;z-index:30;top:calc(env(safe-area-inset-top,0px) + 70px);bottom:calc(env(safe-area-inset-bottom,0px) + 16px);
+  right:max(16px,env(safe-area-inset-right,0px));width:min(460px,calc(100vw - 32px));
+  background:rgba(19,23,34,.94);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:18px;
+  overflow-y:auto;overscroll-behavior:contain;transform:translateX(calc(100% + 40px));transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+.panel.open{transform:none}
+.pin{padding:22px 22px 26px;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--wing);font-variant-numeric:tabular-nums}
+.panel h2{margin:6px 0 0;font-family:var(--f-display);font-weight:700;font-size:23px;line-height:1.2;text-wrap:balance}
+.sec h3{margin:0 0 8px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.story{background:color-mix(in srgb,var(--wing) 11%,var(--surface));border:1px solid color-mix(in srgb,var(--wing) 30%,transparent);
+  border-radius:14px;padding:14px 16px;line-height:1.6;font-size:15px}
+.story h3{color:var(--wing)}
+.story p{margin:0}
+.pts{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.pts li{position:relative;padding-left:18px;line-height:1.5;color:#d9dee8}
+.pts li::before{content:"";position:absolute;left:2px;top:.6em;width:7px;height:7px;border-radius:2px;background:var(--wing)}
+.cmds{display:flex;flex-direction:column;gap:10px}
+.cmd{background:#0d1017;border:1px solid var(--line);border-radius:10px;padding:9px 10px;display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center}
+.cmd code{font-family:var(--f-mono);font-size:13px;color:#f2f5fa;overflow-x:auto;white-space:pre;min-width:0;display:block;padding-bottom:2px}
+.cmd code b{color:var(--wing);font-weight:600;user-select:none}
+.cmd small{grid-column:1/-1;color:var(--muted);font-size:13px;line-height:1.4}
+.copy{border:1px solid var(--line);background:var(--surface-2);border-radius:7px;font-size:11px;padding:4px 8px;cursor:pointer;color:var(--muted);white-space:nowrap}
+.copy:hover{color:var(--fg)}
+.note{font-size:13.5px;line-height:1.55;color:#d9dee8;border:1px dashed var(--line);border-radius:12px;padding:12px 14px}
+.quiz p{margin:0 0 10px;font-weight:500;line-height:1.45}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{text-align:left;border:1px solid var(--line);background:var(--surface-2);border-radius:10px;padding:10px 12px;cursor:pointer;line-height:1.4}
+.opt:hover{border-color:var(--wing)}
+.opt.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,var(--surface-2))}
+.opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,var(--surface-2))}
+.verdict{margin-top:8px;font-size:13.5px;min-height:1.2em}
+.verdict.ok{color:var(--ok)} .verdict.no{color:var(--bad)}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.btn{flex:1 1 140px;border:1px solid var(--line);background:var(--surface-2);border-radius:11px;padding:11px 14px;font-weight:600;cursor:pointer}
+.btn.primary{background:var(--wing);border-color:var(--wing);color:#0b0d12}
+.close{position:sticky;top:0;float:right;margin:-8px -8px 0 0;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);cursor:pointer;font-size:16px;z-index:2}
+
+/* intro */
+.intro{position:fixed;inset:0;z-index:40;display:grid;place-items:center;overflow-y:auto;
+  padding:calc(env(safe-area-inset-top,0px) + 16px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 16px) max(16px,env(safe-area-inset-left,0px));
+  background:radial-gradient(ellipse at 50% 40%,rgba(11,13,18,.35),rgba(11,13,18,.88) 70%)}
+.card{max-width:540px;width:100%;background:rgba(19,23,34,.9);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:22px;padding:28px 26px;display:flex;flex-direction:column;gap:18px}
+.card h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:clamp(30px,7vw,46px);letter-spacing:.01em;line-height:1}
+.card h1 em{font-style:normal;background:linear-gradient(90deg,var(--net),var(--linux) 55%,var(--git));-webkit-background-clip:text;background-clip:text;color:transparent}
+.card p{margin:0;line-height:1.6;color:#d4d9e3;font-size:15.5px}
+.route{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px;font-weight:500}
+.route span{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface-2)}
+.route span i{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.route b{color:var(--muted);font-weight:400}
+.enter{border:0;border-radius:14px;padding:15px 18px;font-weight:600;font-size:16px;cursor:pointer;background:var(--fg);color:#0b0d12}
+.enter:hover{background:#fff}
+.ctrl{font-size:13px;color:var(--muted);line-height:1.5}
+.card .langs{align-self:flex-start;background:var(--surface-2)}
+
+/* hint + pad + toast */
+.hint{position:fixed;z-index:16;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 96px);
+  background:rgba(19,23,34,.92);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;white-space:nowrap;max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
+.pad{position:fixed;z-index:16;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 92px);display:none;flex-direction:column;gap:8px}
+.pad button{width:54px;height:54px;border-radius:14px;border:1px solid var(--line);background:rgba(19,23,34,.85);font-size:18px;touch-action:none;user-select:none;-webkit-user-select:none}
+@media (pointer:coarse){.pad{display:flex}}
+.toast{position:fixed;z-index:50;left:50%;top:calc(env(safe-area-inset-top,0px) + 72px);transform:translateX(-50%);background:var(--ok);color:#0b0d12;
+  font-weight:600;border-radius:12px;padding:10px 16px;font-size:14px;max-width:calc(100vw - 32px);text-align:center}
+
+@media (max-width:720px){
+  .panel{top:auto;bottom:0;left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));width:auto;
+    height:64dvh;max-height:64vh;border-radius:18px 18px 0 0;transform:translateY(105%);padding-bottom:env(safe-area-inset-bottom,0px)}
+  .panel h2{font-size:20px}
+  .pin{padding:18px 16px 22px}
+  .brand{font-size:13px;padding:7px 10px}
+  .bar{width:40px}
+  .wgroup span{font-size:9px}
+  .chip{width:32px;height:32px}
+  .rail-inner{gap:10px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<canvas id="scene" aria-label="3D corridor with lesson rooms"></canvas>
+
+<header class="topbar">
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="2" width="14" height="17" rx="2" fill="none" stroke="#eef1f6" stroke-width="1.6"/><circle cx="13" cy="11" r="1.3" fill="#f4b43c"/></svg>
+    <span>CYBERNEST</span>
+    <span class="prog"><span class="bar"><i id="barFill"></i></span><span id="progTxt">0/10</span></span>
+  </div>
+  <div class="langs" id="langTop" role="group" aria-label="Language"></div>
+</header>
+
+<nav class="rail" aria-label="Rooms"><div class="rail-inner" id="rail"></div></nav>
+
+<div class="hint" id="hint" hidden></div>
+<div class="pad" id="pad">
+  <button id="padF" aria-label="Forward">▲</button>
+  <button id="padB" aria-label="Back">▼</button>
+</div>
+
+<aside class="panel" id="panel" aria-live="polite"><div class="pin" id="pin"></div></aside>
+
+<div class="intro" id="intro">
+  <div class="card">
+    <div class="langs" id="langIntro" role="group" aria-label="Language"></div>
+    <h1>Cyber<em>Nest</em></h1>
+    <p id="introSub"></p>
+    <div class="route" id="route"></div>
+    <button class="enter" id="enterBtn"></button>
+    <div class="ctrl" id="ctrlTxt"></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const L=(ru,uz,tg,en)=>({ru,uz,tg,en});
+const LANGS=[["uz","UZ"],["ru","RU"],["tg","TJ"],["en","EN"]];
+
+const UI={
+  sub:L("Иди по коридору и заходи в комнаты. Каждая комната — один урок с примером из жизни: сети, Linux, Git — до первого push на GitHub.",
+        "Yo'lak bo'ylab yuring va xonalarga kiring. Har bir xona — hayotiy misolli bitta dars: tarmoq, Linux, Git — GitHub'ga birinchi push qilishgacha.",
+        "Дар долон қадам занед ва ба утоқҳо дароед. Ҳар утоқ — як дарс бо мисоли ҳаётӣ: шабака, Linux, Git — то push-и аввал ба GitHub.",
+        "Walk down the corridor and step into the rooms. Each room is one lesson with a real-life example: networks, Linux, Git, all the way to your first push to GitHub."),
+  enter:L("Войти в здание","Binoga kirish","Ба бино даромадан","Enter the building"),
+  ctrlDesk:L("W A S D или стрелки — ходить · тяни мышью — смотреть · клик по двери — войти",
+             "W A S D yoki strelkalar — yurish · sichqonchani torting — qarash · eshikni bosing — kirish",
+             "W A S D ё тирчаҳо — гаштан · бо муш кашед — нигоҳ кардан · ба дар клик — даромадан",
+             "W A S D or arrow keys to walk · drag to look · click a door to enter"),
+  ctrlTouch:L("Кнопки ▲▼ — ходить · проведи пальцем — смотреть · нажми на дверь или номер внизу — войти",
+              "▲▼ tugmalari — yurish · barmoq bilan suring — qarash · eshikka yoki pastdagi raqamga bosing — kirish",
+              "Тугмаҳои ▲▼ — гаштан · бо ангушт кашед — нигоҳ кардан · ба дар ё рақами поён пахш кунед — даромадан",
+              "▲▼ to walk · swipe to look · tap a door or a number below to enter"),
+  story:L("Пример из жизни","Hayotiy misol","Мисоли ҳаётӣ","Real-life example"),
+  points:L("Главное","Asosiysi","Асосӣ","Key ideas"),
+  cmds:L("Команды","Buyruqlar","Фармонҳо","Commands"),
+  quiz:L("Проверь себя","O'zingizni tekshiring","Худро санҷед","Check yourself"),
+  right:L("Верно! Комната пройдена.","To'g'ri! Xona o'tildi.","Дуруст! Утоқ гузашт.","Correct! Room complete."),
+  wrong:L("Не совсем. Перечитай пример и попробуй ещё.","Unchalik emas. Misolni qayta o'qing va yana urinib ko'ring.","На он қадар. Мисолро боз хонед ва аз нав кӯшиш кунед.","Not quite. Reread the example and try again."),
+  back:L("← В коридор","← Yo'lakka","← Ба долон","← Corridor"),
+  next:L("Следующая комната →","Keyingi xona →","Утоқи навбатӣ →","Next room →"),
+  copy:L("Копировать","Nusxa","Нусха","Copy"),
+  copied:L("Скопировано","Nusxalandi","Нусха шуд","Copied"),
+  room:L("Комната","Xona","Утоқ","Room"),
+  hintDoor:L("Нажми E или кликни по двери, чтобы войти","Kirish uchun E ni bosing yoki eshikni bosing","Барои даромадан E-ро пахш кунед ё ба дар клик кунед","Press E or click the door to enter"),
+  hintTouch:L("Нажми на дверь, чтобы войти","Kirish uchun eshikka bosing","Барои даромадан ба дар пахш кунед","Tap the door to enter"),
+  finish:L("Все 10 комнат пройдены. Теперь ты умеешь отправлять проекты на GitHub!","Barcha 10 xona o'tildi. Endi siz loyihalarni GitHub'ga yubora olasiz!","Ҳамаи 10 утоқ гузашт. Акнун шумо лоиҳаҳоро ба GitHub фиристода метавонед!","All 10 rooms done. You can now push your projects to GitHub!"),
+  finale:L("Финиш: git push","Marra: git push","Марра: git push","Finish line: git push"),
+  wings:{net:L("Сети","Tarmoq","Шабака","Networks"),linux:L("Linux","Linux","Linux","Linux"),git:L("Git и GitHub","Git va GitHub","Git ва GitHub","Git & GitHub")}
+};
+
+const ROOMS=[
+{wing:"net",prop:"network",
+ title:L("Что такое сеть?","Tarmoq nima?","Шабака чист?","What is a network?"),
+ story:L("Представь улицу с домами. У каждого дома свой адрес, чтобы почтальон знал, куда нести письмо. Сеть — это улица, компьютеры — дома, а IP-адрес — адрес дома. Домашний Wi‑Fi — одна маленькая улица, а Интернет — целый город из миллионов улиц.",
+         "Uylar qatorlashgan ko'chani tasavvur qiling. Har bir uyning o'z manzili bor, shunda pochtachi xatni qayerga olib borishni biladi. Tarmoq — bu ko'cha, kompyuterlar — uylar, IP-manzil esa uyning manzili. Uydagi Wi‑Fi — bitta kichik ko'cha, Internet esa millionlab ko'chalardan iborat butun shahar.",
+         "Кӯчаеро бо хонаҳо тасаввур кунед. Ҳар хона суроғаи худро дорад, то почтачӣ донад, ки мактубро куҷо барад. Шабака — ин кӯча, компютерҳо — хонаҳо, суроғаи IP бошад — суроғаи хона. Wi‑Fi-и хонагӣ як кӯчаи хурд аст, Интернет бошад — шаҳри бузург аз миллионҳо кӯча.",
+         "Imagine a street of houses. Each house has its own address so the postman knows where to bring letters. A network is that street, computers are the houses, and the IP address is the house address. Your home Wi‑Fi is one small street; the Internet is a whole city of millions of streets."),
+ points:L(["IP-адрес — адрес компьютера, например 192.168.1.15","Локальная сеть (LAN) — твоя домашняя или офисная улица","Интернет — улицы, соединённые между собой","MAC-адрес — как паспорт сетевой карты, он не меняется"],
+          ["IP-manzil — kompyuterning manzili, masalan 192.168.1.15","Lokal tarmoq (LAN) — uyingiz yoki ofisingiz ko'chasi","Internet — bir-biriga ulangan ko'chalar","MAC-manzil — tarmoq kartasining pasporti kabi, u o'zgarmaydi"],
+          ["Суроғаи IP — суроғаи компютер, масалан 192.168.1.15","Шабакаи маҳаллӣ (LAN) — кӯчаи хона ё идораи шумо","Интернет — кӯчаҳое, ки бо ҳам пайвастанд","Суроғаи MAC — мисли шиносномаи корти шабака, тағйир намеёбад"],
+          ["IP address — the computer's address, e.g. 192.168.1.15","Local network (LAN) — your home or office street","Internet — many streets joined together","MAC address — like the network card's passport, it does not change"]),
+ cmds:[["ip a",L("Показать мои IP-адреса (Linux)","Mening IP-manzillarimni ko'rsatish (Linux)","Суроғаҳои IP-и маро нишон медиҳад (Linux)","Show my IP addresses (Linux)")],
+       ["ipconfig",L("То же самое в Windows","Windows'da xuddi shu","Ҳамин дар Windows","The same on Windows")],
+       ["hostname -I",L("Короткий список IP","IP'larning qisqa ro'yxati","Рӯйхати кӯтоҳи IP","Short list of IPs")]],
+ quiz:{q:L("На что больше всего похож IP-адрес?","IP-manzil eng ko'p nimaga o'xshaydi?","Суроғаи IP ба чӣ бештар монанд аст?","What is an IP address most like?"),
+       o:L(["Адрес дома","Цвет дома","Имя хозяина"],["Uy manziliga","Uyning rangiga","Uy egasining ismiga"],["Ба суроғаи хона","Ба ранги хона","Ба номи соҳибхона"],["A house address","The colour of the house","The owner's name"])}},
+
+{wing:"net",prop:"router",
+ title:L("Роутер и DNS","Router va DNS","Роутер ва DNS","Router and DNS"),
+ story:L("Роутер — это почтовое отделение твоей улицы: каждое письмо из дома проходит через него, и он знает, какая дорога ведёт в город. DNS — это список контактов в телефоне: ты нажимаешь «Мама», а телефон набирает номер. Ты пишешь google.com, а DNS находит его IP-адрес, например 142.250.74.14.",
+         "Router — ko'changizning pochta bo'limi: uydan chiqadigan har bir xat undan o'tadi va u shaharga qaysi yo'l olib borishini biladi. DNS — telefoningizdagi kontaktlar ro'yxati: siz «Onam»ni bosasiz, telefon raqamni teradi. Siz google.com deb yozasiz, DNS uning IP-manzilini topadi, masalan 142.250.74.14.",
+         "Роутер — шӯъбаи почтаи кӯчаи шумост: ҳар мактубе, ки аз хона мебарояд, аз он мегузарад ва он медонад, ки кадом роҳ ба шаҳр мебарад. DNS — рӯйхати тамосҳо дар телефони шумост: шумо «Модар»-ро пахш мекунед, телефон рақамро мегирад. Шумо google.com менависед, DNS суроғаи IP-и онро меёбад, масалан 142.250.74.14.",
+         "The router is the post office of your street: every letter leaving your home passes through it, and it knows which road leads to the city. DNS is the contacts list on your phone: you tap “Mom” and the phone dials the number. You type google.com and DNS finds its IP address, like 142.250.74.14."),
+ points:L(["Роутер — соединяет домашнюю сеть с Интернетом","Шлюз (gateway) — адрес роутера, часто 192.168.1.1","DNS — превращает имена (google.com) в IP-адреса","Без DNS пришлось бы запоминать цифры каждого сайта"],
+          ["Router — uy tarmog'ini Internetga ulaydi","Shlyuz (gateway) — routerning manzili, ko'pincha 192.168.1.1","DNS — nomlarni (google.com) IP-manzillarga aylantiradi","DNS bo'lmasa, har bir saytning raqamlarini yodlashga to'g'ri kelardi"],
+          ["Роутер — шабакаи хонагиро ба Интернет мепайвандад","Дарвоза (gateway) — суроғаи роутер, аксар вақт 192.168.1.1","DNS — номҳоро (google.com) ба суроғаҳои IP табдил медиҳад","Бе DNS шумо бояд рақамҳои ҳар сайтро аз ёд мекардед"],
+          ["Router — joins your home network to the Internet","Gateway — the router's address, often 192.168.1.1","DNS — turns names (google.com) into IP addresses","Without DNS you would have to remember numbers for every site"]),
+ cmds:[["ip route",L("Показать шлюз (куда уходит трафик)","Shlyuzni ko'rsatish (trafik qayerdan chiqadi)","Дарвозаро нишон медиҳад (трафик аз куҷо мебарояд)","Show the gateway (where traffic leaves)")],
+       ["nslookup google.com",L("Узнать IP сайта через DNS","DNS orqali saytning IP'sini bilish","IP-и сайтро тавассути DNS фаҳмидан","Find a site's IP through DNS")],
+       ["cat /etc/resolv.conf",L("Какой DNS-сервер спрашивает мой компьютер","Kompyuterim qaysi DNS-serverdan so'raydi","Компютерам аз кадом сервери DNS мепурсад","Which DNS server my computer asks")]],
+ quiz:{q:L("Что делает DNS?","DNS nima qiladi?","DNS чӣ кор мекунад?","What does DNS do?"),
+       o:L(["Превращает имя сайта в IP-адрес","Ускоряет Wi‑Fi","Хранит пароли"],["Sayt nomini IP-manzilga aylantiradi","Wi‑Fi'ni tezlashtiradi","Parollarni saqlaydi"],["Номи сайтро ба суроғаи IP табдил медиҳад","Wi‑Fi-ро тез мекунад","Паролҳоро нигоҳ медорад"],["Turns a site name into an IP address","Makes Wi‑Fi faster","Stores passwords"])}},
+
+{wing:"net",prop:"ports",
+ title:L("Порты и протоколы","Portlar va protokollar","Портҳо ва протоколҳо","Ports and protocols"),
+ story:L("IP-адрес приводит тебя к зданию. Порт — номер кабинета внутри. В одном здании может быть банк в кабинете 443, почта в 25 и охрана в 22. Протокол — язык, на котором говорят в кабинете: в банке говорят на HTTPS, у охраны — на SSH.",
+         "IP-manzil sizni binoga olib keladi. Port — bino ichidagi xonaning raqami. Bitta binoda 443-xonada bank, 25-xonada pochta, 22-xonada qorovulxona bo'lishi mumkin. Protokol — o'sha xonada gaplashiladigan til: bankda HTTPS tilida, qorovulxonada SSH tilida gaplashiladi.",
+         "Суроғаи IP шуморо ба бино мебарад. Порт — рақами утоқ дар дохили он. Дар як бино метавонад дар утоқи 443 бонк, дар 25 почта ва дар 22 посбонхона бошад. Протокол — забонест, ки дар он утоқ гап мезананд: дар бонк бо HTTPS, дар посбонхона бо SSH.",
+         "An IP address brings you to a building. A port is the office number inside it. One building can have a bank in office 443, a post office in 25 and a guard room in 22. A protocol is the language spoken in that office: the bank speaks HTTPS, the guard room speaks SSH."),
+ points:L(["Порт — число от 0 до 65535","80 — HTTP (сайт без шифрования)","443 — HTTPS (сайт с замочком)","22 — SSH (удалённое управление сервером)","TCP — заказное письмо: доставка подтверждается. UDP — крик через двор: быстро, без проверки"],
+          ["Port — 0 dan 65535 gacha bo'lgan son","80 — HTTP (shifrlanmagan sayt)","443 — HTTPS (qulfchali sayt)","22 — SSH (serverni masofadan boshqarish)","TCP — buyurtma xat: yetkazilgani tasdiqlanadi. UDP — hovli orqali qichqiriq: tez, lekin tekshiruvsiz"],
+          ["Порт — рақам аз 0 то 65535","80 — HTTP (сайт бе рамзгузорӣ)","443 — HTTPS (сайт бо қулф)","22 — SSH (идоракунии дурдасти сервер)","TCP — мактуби супоришӣ: расидан тасдиқ мешавад. UDP — фарёд аз болои ҳавлӣ: зуд, бе санҷиш"],
+          ["Port — a number from 0 to 65535","80 — HTTP (website without encryption)","443 — HTTPS (website with a padlock)","22 — SSH (remote control of a server)","TCP — a registered letter: delivery is confirmed. UDP — a shout across the yard: fast, no check"]),
+ cmds:[["ss -tuln",L("Какие порты открыты на моём компьютере","Kompyuterimda qaysi portlar ochiq","Дар компютерам кадом портҳо кушодаанд","Which ports are open on my computer")],
+       ["curl -I https://github.com",L("Постучаться в порт 443 и прочитать заголовки ответа","443-portni taqillatib, javob sarlavhalarini o'qish","Порти 443-ро тақ-тақ кардан ва сарлавҳаҳои ҷавобро хондан","Knock on port 443 and read the reply headers")],
+       ["nc -zv github.com 22",L("Проверить, открыт ли порт 22","22-port ochiqligini tekshirish","Санҷидан, ки порти 22 кушода аст","Check whether port 22 is open")]],
+ quiz:{q:L("Какой порт обычно использует HTTPS?","HTTPS odatda qaysi portdan foydalanadi?","HTTPS одатан кадом портро истифода мебарад?","Which port does HTTPS usually use?"),
+       o:L(["443","22","25"],["443","22","25"],["443","22","25"],["443","22","25"])}},
+
+{wing:"net",prop:"ping",
+ title:L("Ping и traceroute","Ping va traceroute","Ping ва traceroute","Ping and traceroute"),
+ story:L("Ping — как позвать друга по имени в тёмном коридоре: «Ты здесь?» — «Да!» — и ты замеряешь, сколько шёл ответ. Traceroute — как спрашивать на каждом перекрёстке: «На какой я сейчас улице?» Так видно весь путь до сайта и место, где он застревает.",
+         "Ping — qorong'i yo'lakda do'stingizni ismini aytib chaqirishga o'xshaydi: «Shu yerdamisan?» — «Ha!» — va javob qancha vaqtda kelganini o'lchaysiz. Traceroute — yo'ldagi har bir chorrahada «Hozir qaysi ko'chadaman?» deb so'rashga o'xshaydi. Shunda saytgacha bo'lgan butun yo'lni va qayerda tiqilib qolganini ko'rasiz.",
+         "Ping — мисли он аст, ки дар долони торик дӯстатонро бо ном ҷеғ занед: «Дар ин ҷоӣ?» — «Ҳа!» — ва чен мекунед, ки ҷавоб чӣ қадар вақт гирифт. Traceroute — мисли он ки дар ҳар чорроҳа пурсед: «Ҳоло дар кадом кӯчаам?» Ҳамин тавр тамоми роҳро то сайт ва ҷои дармондани онро мебинед.",
+         "Ping is like calling a friend's name in a dark corridor: “Are you there?” — “Yes!” — and you time how long the answer took. Traceroute is like asking at every crossroads: “Which street am I on now?” That way you see the whole route to a site and where it gets stuck."),
+ points:L(["ping — проверяет, отвечает ли компьютер и как быстро (мс)","time=20 ms — хорошо; 300 ms — медленно; нет ответа — проблема или блокировка","traceroute — показывает каждый роутер (хоп) по пути","ping 8.8.8.8 работает, а ping google.com нет → проблема в DNS"],
+          ["ping — kompyuter javob beradimi va qanchalik tez (ms), shuni tekshiradi","time=20 ms — yaxshi; 300 ms — sekin; javob yo'q — muammo yoki bloklangan","traceroute — yo'ldagi har bir routerni (hop) ko'rsatadi","ping 8.8.8.8 ishlaydi, ping google.com ishlamaydi → muammo DNS'da"],
+          ["ping — месанҷад, ки компютер ҷавоб медиҳад ва чӣ қадар зуд (ms)","time=20 ms — хуб; 300 ms — суст; ҷавоб нест — мушкил ё баста","traceroute — ҳар роутерро (hop) дар роҳ нишон медиҳад","ping 8.8.8.8 кор мекунад, вале ping google.com не → мушкил дар DNS"],
+          ["ping — checks whether a computer answers, and how fast (ms)","time=20 ms is good; 300 ms is slow; no answer means a problem or a block","traceroute — shows every router (hop) along the way","ping 8.8.8.8 works but ping google.com doesn't → DNS problem"]),
+ cmds:[["ping -c 4 8.8.8.8",L("Отправить 4 пакета «ты здесь?»","4 ta «shu yerdamisan?» paketini yuborish","4 бастаи «дар ин ҷоӣ?» фиристодан","Send 4 “are you there?” packets")],
+       ["ping -c 4 google.com",L("То же, но по имени (проверяет и DNS)","Xuddi shu, lekin nom bilan (DNS'ni ham tekshiradi)","Ҳамин, вале бо ном (DNS-ро ҳам месанҷад)","Same, but by name (also tests DNS)")],
+       ["traceroute google.com",L("Показать маршрут по шагам (в Windows: tracert)","Yo'lni qadamma-qadam ko'rsatish (Windows'da: tracert)","Роҳро қадам ба қадам нишон додан (дар Windows: tracert)","Show the route step by step (Windows: tracert)")]],
+ quiz:{q:L("ping 8.8.8.8 работает, а ping google.com — нет. Где скорее всего проблема?","ping 8.8.8.8 ishlaydi, lekin ping google.com ishlamaydi. Muammo ko'proq qayerda?","ping 8.8.8.8 кор мекунад, вале ping google.com не. Мушкил бештар дар куҷост?","ping 8.8.8.8 works, but ping google.com doesn't. Where is the problem most likely?"),
+       o:L(["В DNS","В сетевом кабеле","В мониторе"],["DNS'da","Tarmoq kabelida","Monitorda"],["Дар DNS","Дар кабели шабака","Дар монитор"],["DNS","The network cable","The monitor"])}},
+
+{wing:"linux",prop:"terminal",
+ title:L("Linux и терминал","Linux va terminal","Linux ва терминал","Linux and the terminal"),
+ story:L("Linux — это само здание: стены, электричество, лифты. Терминал — домофон к управляющему зданием. Вместо того чтобы ходить и кликать, ты говоришь точно, что нужно: «покажи комнаты», «сделай новую комнату». Управляющий делает это сразу и никогда не устаёт.",
+         "Linux — binoning o'zi: devorlar, elektr, liftlar. Terminal — bino boshqaruvchisiga ulangan domofon. Yurib, sichqoncha bilan bosish o'rniga, nima kerakligini aniq aytasiz: «xonalarni ko'rsat», «yangi xona qil». Boshqaruvchi buni darhol bajaradi va hech qachon charchamaydi.",
+         "Linux — худи бино аст: деворҳо, барқ, лифтҳо. Терминал — домофон ба мудири бино. Ба ҷои гаштан ва клик кардан, шумо аниқ мегӯед, ки чӣ лозим: «утоқҳоро нишон деҳ», «утоқи нав соз». Мудир инро фавран иҷро мекунад ва ҳеҷ гоҳ хаста намешавад.",
+         "Linux is the building itself: walls, electricity, elevators. The terminal is the intercom to the building manager. Instead of walking around and clicking, you say exactly what you want: “show me the rooms”, “build a new room”. The manager does it at once and never gets tired."),
+ points:L(["На Linux работают большинство серверов, телефоны Android и суперкомпьютеры","Дистрибутивы: Ubuntu, Debian, Fedora — одно здание, разный интерьер","Терминал (shell, bash) — ты пишешь команды, компьютер отвечает","$ в начале строки значит «жду твою команду»","Нет Linux? В Windows поставь WSL: wsl --install"],
+          ["Ko'pchilik serverlar, Android telefonlar va superkompyuterlar Linux'da ishlaydi","Distributivlar: Ubuntu, Debian, Fedora — bitta bino, har xil interyer","Terminal (shell, bash) — siz buyruq yozasiz, kompyuter javob beradi","Qator boshidagi $ «buyrug'ingizni kutyapman» degani","Linux yo'qmi? Windows'da WSL o'rnating: wsl --install"],
+          ["Аксари серверҳо, телефонҳои Android ва суперкомпютерҳо дар Linux кор мекунанд","Дистрибутивҳо: Ubuntu, Debian, Fedora — як бино, дохилаи гуногун","Терминал (shell, bash) — шумо фармон менависед, компютер ҷавоб медиҳад","$ дар аввали сатр яъне «фармони шуморо интизорам»","Linux надоред? Дар Windows WSL насб кунед: wsl --install"],
+          ["Most servers, Android phones and supercomputers run Linux","Distributions: Ubuntu, Debian, Fedora — same building, different interior","Terminal (shell, bash) — you type commands, the computer answers","$ at the start of a line means “waiting for your command”","No Linux? Install WSL on Windows: wsl --install"]),
+ cmds:[["whoami",L("Кто я в этом здании?","Bu binoda men kimman?","Ман дар ин бино кистам?","Who am I in this building?")],
+       ["uname -a",L("Какой Linux и ядро","Qaysi Linux va yadro","Кадом Linux ва ядро","Which Linux and kernel")],
+       ["sudo apt update",L("Обновить список программ (sudo = попросить ключом управляющего)","Dasturlar ro'yxatini yangilash (sudo = boshqaruvchi kaliti bilan so'rash)","Рӯйхати барномаҳоро нав кардан (sudo = бо калиди мудир пурсидан)","Refresh the list of programs (sudo = ask with the manager's key)")],
+       ["man ls",L("Открыть инструкцию к любой команде","Istalgan buyruqning qo'llanmasini ochish","Дастури ҳар фармонро кушодан","Open the manual for any command")]],
+ quiz:{q:L("Что означает sudo?","sudo nimani anglatadi?","sudo чӣ маъно дорад?","What does sudo mean?"),
+       o:L(["Выполнить команду с правами администратора","Удалить файл","Выключить компьютер"],["Buyruqni administrator huquqlari bilan bajarish","Faylni o'chirish","Kompyuterni o'chirish"],["Фармонро бо ҳуқуқи администратор иҷро кардан","Файлро нест кардан","Компютерро хомӯш кардан"],["Run the command with administrator rights","Delete the file","Turn off the computer"])}},
+
+{wing:"linux",prop:"tree",
+ title:L("Файлы и папки","Fayllar va papkalar","Файлҳо ва ҷузвдонҳо","Files and folders"),
+ story:L("Это как раз наш коридор. / (корень) — главный вход. /home/ali — квартира Али. pwd отвечает «где я стою?», ls — «осмотрись в комнате», cd — «пройди в дверь», а cd .. — «выйди назад в коридор».",
+         "Bu aynan bizning yo'lagimiz. / (root) — asosiy kirish eshigi. /home/ali — Alining kvartirasi. pwd «qayerda turibman?» savoliga javob beradi, ls — «xonaga qarab chiq», cd — «eshikdan kir», cd .. esa — «yo'lakka qaytib chiq».",
+         "Ин маҳз долони мост. / (реша) — даромадгоҳи асосӣ. /home/ali — хонаи Алӣ. pwd ба савол «ман дар куҷо истодаам?» ҷавоб медиҳад, ls — «ба утоқ нигоҳ кун», cd — «аз дар даро», cd .. бошад — «ба долон баргард».",
+         "This is exactly our corridor. / (root) is the main entrance. /home/ali is Ali's apartment. pwd answers “where am I standing?”, ls means “look around the room”, cd means “walk through a door”, and cd .. means “step back into the corridor”."),
+ points:L(["/ — корень, начало всего","~ — твоя домашняя папка (/home/твоё_имя)",". — эта комната, .. — шаг назад","Linux различает регистр: File.txt и file.txt — разные файлы","Клавиша Tab дописывает имена за тебя"],
+          ["/ — ildiz, hamma narsaning boshlanishi","~ — uy papkangiz (/home/ismingiz)",". — shu xona, .. — bir qadam orqaga","Linux katta-kichik harfni farqlaydi: File.txt va file.txt — boshqa-boshqa","Tab tugmasi nomlarni o'zi to'ldiradi"],
+          ["/ — реша, ибтидои ҳама чиз","~ — ҷузвдони хонагии шумо (/home/номи_шумо)",". — ҳамин утоқ, .. — як қадам ба қафо","Linux ҳарфҳои калон ва хурдро фарқ мекунад: File.txt ва file.txt гуногунанд","Тугмаи Tab номҳоро худаш пурра мекунад"],
+          ["/ — root, where everything starts","~ — your home folder (/home/your_name)",". — this room, .. — one step back","Linux is case-sensitive: File.txt and file.txt are different files","The Tab key finishes names for you"]),
+ cmds:[["pwd",L("Где я?","Qayerdaman?","Ман дар куҷоям?","Where am I?")],
+       ["ls -la",L("Осмотреться, включая скрытые файлы","Atrofga qarash, yashirin fayllar bilan","Ба атроф нигоҳ кардан, бо файлҳои пинҳонӣ","Look around, hidden files included")],
+       ["cd /etc",L("Зайти в комнату /etc","/etc xonasiga kirish","Ба утоқи /etc даромадан","Walk into the /etc room")],
+       ["cd ..",L("Шаг назад","Bir qadam orqaga","Як қадам ба қафо","One step back")],
+       ["mkdir project",L("Построить новую комнату","Yangi xona qurish","Утоқи нав сохтан","Build a new room")],
+       ["touch notes.txt",L("Создать пустой файл","Bo'sh fayl yaratish","Файли холӣ сохтан","Create an empty file")],
+       ["cp notes.txt copy.txt",L("Копировать","Nusxalash","Нусха бардоштан","Copy")],
+       ["mv copy.txt project/",L("Переместить или переименовать","Ko'chirish yoki nomini o'zgartirish","Кӯчондан ё номашро иваз кардан","Move or rename")],
+       ["cat notes.txt",L("Прочитать файл","Faylni o'qish","Файлро хондан","Read a file")],
+       ["rm notes.txt",L("Удалить (корзины нет!)","O'chirish (savat yo'q!)","Нест кардан (сабад нест!)","Delete (there is no trash bin!)")]],
+ quiz:{q:L("Какая команда говорит, где ты сейчас?","Hozir qayerda ekaningizni qaysi buyruq aytadi?","Кадом фармон мегӯяд, ки шумо ҳоло дар куҷоед?","Which command tells you where you are now?"),
+       o:L(["pwd","ls","rm"],["pwd","ls","rm"],["pwd","ls","rm"],["pwd","ls","rm"])}},
+
+{wing:"linux",prop:"lock",
+ title:L("Права доступа","Ruxsatlar","Иҷозатҳо","Permissions"),
+ story:L("У каждой комнаты есть замок и три группы людей: хозяин (owner), семья (group) и гости (others). Каждому можно дать три ключа: r — заглянуть внутрь (чтение), w — двигать мебель (запись), x — войти или запустить (выполнение). -rwxr-x--- значит: у хозяина все ключи, семья может смотреть и входить, гости стоят снаружи.",
+         "Har bir xonaning qulfi va uch guruh odami bor: egasi (owner), oilasi (group) va mehmonlar (others). Har biriga uchta kalit berish mumkin: r — ichkariga qarash (o'qish), w — mebelni surish (yozish), x — kirish yoki ishga tushirish (bajarish). -rwxr-x--- degani: egasida hamma kalit bor, oila qarashi va kirishi mumkin, mehmonlar tashqarida turadi.",
+         "Ҳар утоқ қулф ва се гурӯҳи одамон дорад: соҳиб (owner), оила (group) ва меҳмонон (others). Ба ҳар кадом се калид додан мумкин: r — ба дарун нигоҳ кардан (хондан), w — мебелро ҷойиваз кардан (навиштан), x — даромадан ё иҷро кардан. -rwxr-x--- яъне: соҳиб ҳамаи калидҳоро дорад, оила нигоҳ карда ва даромада метавонад, меҳмонон берун меистанд.",
+         "Every room has a lock and three groups of people: the owner, the family (group) and guests (others). Each can get three keys: r — look inside (read), w — move the furniture (write), x — walk in or run (execute). -rwxr-x--- means the owner has every key, the family can look and enter, and guests stay outside."),
+ points:L(["r = 4, w = 2, x = 1 — складываем","chmod 755 → хозяин 7 (rwx), группа 5 (r-x), остальные 5 (r-x)","chmod 600 → читать и писать может только хозяин (хорошо для секретных ключей)","chown меняет хозяина комнаты","Permission denied = у тебя нет ключа"],
+          ["r = 4, w = 2, x = 1 — qo'shib chiqamiz","chmod 755 → egasi 7 (rwx), guruh 5 (r-x), boshqalar 5 (r-x)","chmod 600 → faqat egasi o'qiy va yoza oladi (maxfiy kalitlar uchun yaxshi)","chown xona egasini almashtiradi","Permission denied = sizda kalit yo'q"],
+          ["r = 4, w = 2, x = 1 — ҷамъ мекунем","chmod 755 → соҳиб 7 (rwx), гурӯҳ 5 (r-x), дигарон 5 (r-x)","chmod 600 → танҳо соҳиб хонда ва навишта метавонад (барои калидҳои махфӣ хуб)","chown соҳиби утоқро иваз мекунад","Permission denied = шумо калид надоред"],
+          ["r = 4, w = 2, x = 1 — add them up","chmod 755 → owner 7 (rwx), group 5 (r-x), others 5 (r-x)","chmod 600 → only the owner can read and write (good for secret keys)","chown changes who owns the room","Permission denied = you don't have the key"]),
+ cmds:[["ls -l",L("Увидеть замки на каждом файле","Har bir fayldagi qulflarni ko'rish","Қулфҳоро дар ҳар файл дидан","See the locks on every file")],
+       ["chmod +x script.sh",L("Дать ключ «запуск»","«Ishga tushirish» kalitini berish","Калиди «иҷро»-ро додан","Give the “run” key")],
+       ["chmod 600 secret.txt",L("Только для меня","Faqat men uchun","Танҳо барои ман","Only for me")],
+       ["sudo chown ali file.txt",L("Сделать Али хозяином","Alini ega qilish","Алиро соҳиб кардан","Make Ali the owner")]],
+ quiz:{q:L("Что делает chmod +x?","chmod +x nima qiladi?","chmod +x чӣ мекунад?","What does chmod +x do?"),
+       o:L(["Делает файл исполняемым","Удаляет файл","Прячет файл"],["Faylni bajariladigan qiladi","Faylni o'chiradi","Faylni yashiradi"],["Файлро иҷрошаванда мекунад","Файлро нест мекунад","Файлро пинҳон мекунад"],["Makes the file executable","Deletes the file","Hides the file"])}},
+
+{wing:"linux",prop:"key",
+ title:L("SSH и ключи","SSH va kalitlar","SSH ва калидҳо","SSH and keys"),
+ story:L("SSH — секретный тоннель в другое здание. Ты стоишь в своей комнате, а руки работают на сервере на другом конце света. Вместо пароля используется пара ключей: приватный ключ — настоящий ключ, он всегда в твоём кармане; публичный ключ — замок, который можно дать кому угодно. GitHub получает замок, ключ остаётся у тебя.",
+         "SSH — boshqa binoga olib boruvchi maxfiy tunnel. Siz o'z xonangizda turasiz, qo'llaringiz esa dunyoning narigi chekkasidagi serverda ishlaydi. Parol o'rniga kalitlar jufti ishlatiladi: shaxsiy (private) kalit — haqiqiy kalit, u doim cho'ntagingizda; ochiq (public) kalit — istalgan odamga berish mumkin bo'lgan qulf. GitHub qulfni oladi, kalit sizda qoladi.",
+         "SSH — нақби махфӣ ба бинои дигар. Шумо дар утоқи худ истодаед, вале дастонатон дар сервере дар он сари дунё кор мекунанд. Ба ҷои парол як ҷуфт калид истифода мешавад: калиди хусусӣ — калиди аслӣ, ҳамеша дар кисаи шумо; калиди ошкоро — қулфест, ки ба ҳар кас додан мумкин. GitHub қулфро мегирад, калид дар назди шумо мемонад.",
+         "SSH is a secret tunnel to another building. You stand in your own room, but your hands work on a server on the other side of the world. Instead of a password you use a key pair: the private key is the real key and stays in your pocket; the public key is a lock you can hand to anyone. GitHub gets the lock, you keep the key."),
+ points:L(["ssh user@server — открыть тоннель","id_ed25519 — приватный ключ, никому не показывай","id_ed25519.pub — публичный ключ, его можно дать GitHub и серверам","Добавь .pub ключ на GitHub: Settings → SSH and GPG keys → New SSH key"],
+          ["ssh user@server — tunnelni ochish","id_ed25519 — shaxsiy kalit, hech kimga ko'rsatmang","id_ed25519.pub — ochiq kalit, uni GitHub va serverlarga berish mumkin","Ochiq kalitni GitHub'ga qo'shing: Settings → SSH and GPG keys → New SSH key"],
+          ["ssh user@server — нақбро кушодан","id_ed25519 — калиди хусусӣ, ба ҳеҷ кас нишон надиҳед","id_ed25519.pub — калиди ошкоро, онро ба GitHub ва серверҳо додан мумкин","Калиди .pub-ро ба GitHub илова кунед: Settings → SSH and GPG keys → New SSH key"],
+          ["ssh user@server — open the tunnel","id_ed25519 — the private key, never show it to anyone","id_ed25519.pub — the public key, safe to give to GitHub and servers","Add the .pub key on GitHub: Settings → SSH and GPG keys → New SSH key"]),
+ cmds:[["ssh-keygen -t ed25519 -C \"you@example.com\"",L("Создать пару ключей (Enter на все вопросы)","Kalitlar juftini yaratish (hamma savolga Enter)","Ҷуфти калид сохтан (ба ҳама саволҳо Enter)","Make a key pair (press Enter for every question)")],
+       ["cat ~/.ssh/id_ed25519.pub",L("Показать публичный ключ, чтобы скопировать в GitHub","GitHub'ga nusxalash uchun ochiq kalitni ko'rsatish","Калиди ошкоро нишон додан, то ба GitHub нусха гиред","Show the public key to copy into GitHub")],
+       ["ssh -T git@github.com",L("Проверка: GitHub должен поздороваться по твоему имени","Tekshiruv: GitHub sizni ismingiz bilan salomlashishi kerak","Санҷиш: GitHub бояд бо номи шумо салом диҳад","Test: GitHub should greet you by your username")],
+       ["ssh ali@203.0.113.10",L("Подключиться к серверу","Serverga ulanish","Ба сервер пайваст шудан","Connect to a server")]],
+ quiz:{q:L("Какой ключ можно дать GitHub?","GitHub'ga qaysi kalitni berish mumkin?","Кадом калидро ба GitHub додан мумкин?","Which key can you give to GitHub?"),
+       o:L(["Публичный (.pub)","Приватный","Оба"],["Ochiq kalitni (.pub)","Shaxsiy kalitni","Ikkalasini ham"],["Ошкоро (.pub)","Хусусӣ","Ҳарду"],["The public one (.pub)","The private one","Both"])}},
+
+{wing:"git",prop:"commits",
+ title:L("Git: точки сохранения","Git: saqlash nuqtalari","Git: нуқтаҳои захира","Git: save points"),
+ story:L("Git — фотоальбом твоего проекта. Каждый коммит — фото всех файлов в один момент с короткой подписью. git add — выбрать, кто встанет в кадр, git commit — нажать на кнопку. Если завтра что-то сломаешь, открываешь альбом и возвращаешься к вчерашнему фото.",
+         "Git — loyihangizning fotoalbomi. Har bir commit — bir lahzadagi barcha fayllarning qisqa izohli surati. git add — suratga kim tushishini tanlash, git commit — tugmani bosish. Ertaga biror narsani buzib qo'ysangiz, albomni ochib, kechagi suratga qaytasiz.",
+         "Git — албоми аксҳои лоиҳаи шумост. Ҳар commit — акси ҳамаи файлҳо дар як лаҳза бо имзои кӯтоҳ. git add — интихоб, ки кӣ ба акс медарояд, git commit — пахш кардани тугма. Агар фардо чизеро вайрон кунед, албомро кушода ба акси дирӯза бармегардед.",
+         "Git is a photo album for your project. Each commit is a photo of all your files at one moment, with a short caption. git add chooses who stands in the picture, git commit presses the shutter. If you break something tomorrow, you open the album and go back to yesterday's photo."),
+ points:L(["Репозиторий (repo) — папка проекта, за которой следит Git","Рабочая папка → подготовка (git add) → история (git commit)","Хорошее сообщение коммита говорит, что изменилось: «Добавил страницу входа»","Ветка (branch) — параллельный коридор, где пробуешь идеи, не ломая main"],
+          ["Repozitoriy (repo) — Git kuzatib turadigan loyiha papkasi","Ishchi papka → tayyorlash (git add) → tarix (git commit)","Yaxshi commit xabari nima o'zgarganini aytadi: «Kirish sahifasi qo'shildi»","Branch (shoxcha) — main'ni buzmasdan g'oyalarni sinab ko'radigan parallel yo'lak"],
+          ["Репозиторий (repo) — ҷузвдони лоиҳа, ки Git онро назорат мекунад","Ҷузвдони корӣ → омодасозӣ (git add) → таърих (git commit)","Паёми хуби commit мегӯяд, ки чӣ тағйир ёфт: «Саҳифаи вуруд илова шуд»","Шоха (branch) — долони мувозӣ, ки дар он ғояҳоро бе вайрон кардани main месанҷед"],
+          ["Repository (repo) — a project folder that Git watches","Working folder → staging (git add) → history (git commit)","A good commit message says what changed: “Add login page”","Branch — a parallel corridor where you try ideas without breaking main"]),
+ cmds:[["git config --global user.name \"Your Name\"",L("Подписать свои фото (один раз)","Suratlaringizga imzo qo'yish (bir marta)","Ба аксҳоятон имзо гузоштан (як бор)","Sign your photos (once)")],
+       ["git config --global user.email \"you@example.com\"",L("Твоя почта для подписи","Imzo uchun pochtangiz","Почтаи шумо барои имзо","Your email for the signature")],
+       ["git init",L("Начать альбом в этой папке","Shu papkada albom boshlash","Дар ҳамин ҷузвдон албом оғоз кардан","Start an album in this folder")],
+       ["git status",L("Что изменилось?","Nima o'zgardi?","Чӣ тағйир ёфт?","What changed?")],
+       ["git add .",L("Поставить все изменения в кадр","Barcha o'zgarishlarni kadrga qo'yish","Ҳамаи тағйиротро ба акс гузоштан","Put all changes into the picture")],
+       ["git commit -m \"First commit\"",L("Сделать фото","Suratga olish","Акс гирифтан","Take the photo")],
+       ["git log --oneline",L("Листать альбом","Albomni varaqlash","Албомро варақ задан","Flip through the album")]],
+ quiz:{q:L("Какая команда делает «фото» (сохраняет в историю)?","Qaysi buyruq «surat» oladi (tarixga saqlaydi)?","Кадом фармон «акс» мегирад (ба таърих захира мекунад)?","Which command takes the “photo” (saves to history)?"),
+       o:L(["git commit","git add","git status"],["git commit","git add","git status"],["git commit","git add","git status"],["git commit","git add","git status"])}},
+
+{wing:"git",prop:"cloud",
+ title:L("Push на GitHub","GitHub'ga push","Push ба GitHub","Push to GitHub"),
+ story:L("Пока твой альбом живёт только в твоей комнате. GitHub — надёжный склад в облаке. remote — адрес склада, написанный на твоей коробке, а push — курьер, который относит туда новые фото. Потеряешь ноутбук — проект всё равно цел, и друзья тоже могут его увидеть.",
+         "Hozircha albomingiz faqat xonangizda yashaydi. GitHub — bulutdagi ishonchli ombor. remote — qutingizga yozilgan ombor manzili, push esa yangi suratlarni u yerga olib boradigan kuryer. Noutbukni yo'qotsangiz ham loyiha butun qoladi, do'stlaringiz ham uni ko'ra oladi.",
+         "Ҳоло албоми шумо танҳо дар утоқи шумо зиндагӣ мекунад. GitHub — анбори боэътимод дар абр. remote — суроғаи анбор, ки дар қуттии шумо навишта шудааст, push бошад — хаткашонест, ки аксҳои навро ба он ҷо мебарад. Ноутбукро гум кунед ҳам, лоиҳа солим мемонад ва дӯстонатон низ онро дида метавонанд.",
+         "So far your album lives only in your room. GitHub is a safe warehouse in the cloud. remote is the warehouse address written on your box, and push is the courier who carries new photos there. Lose your laptop and the project is still safe, and your friends can see it too."),
+ points:L(["1. На github.com нажми New repository, дай имя, README не добавляй","2. Скопируй адрес репозитория (SSH: git@github.com:имя/repo.git)","3. Подключи: git remote add origin …","4. Назови главную ветку: git branch -M main","5. Отправь: git push -u origin main","Дальше каждый раз: git add . → git commit -m \"…\" → git push"],
+          ["1. github.com'da New repository'ni bosing, nom bering, README qo'shmang","2. Repozitoriy manzilini nusxalang (SSH: git@github.com:ism/repo.git)","3. Ulang: git remote add origin …","4. Asosiy shoxchani nomlang: git branch -M main","5. Yuboring: git push -u origin main","Keyingi safar shunchaki: git add . → git commit -m \"…\" → git push"],
+          ["1. Дар github.com New repository-ро пахш кунед, ном диҳед, README илова накунед","2. Суроғаи репозиторийро нусха гиред (SSH: git@github.com:ном/repo.git)","3. Пайваст кунед: git remote add origin …","4. Шохаи асосиро ном диҳед: git branch -M main","5. Фиристед: git push -u origin main","Минбаъд ҳар дафъа: git add . → git commit -m \"…\" → git push"],
+          ["1. On github.com press New repository, give it a name, don't add a README","2. Copy the repository address (SSH: git@github.com:name/repo.git)","3. Connect it: git remote add origin …","4. Name the main branch: git branch -M main","5. Send it: git push -u origin main","From then on: git add . → git commit -m \"…\" → git push"]),
+ cmds:[["mkdir my-site && cd my-site",L("Создать папку проекта и зайти в неё","Loyiha papkasini yaratib, unga kirish","Ҷузвдони лоиҳа сохтан ва ба он даромадан","Create the project folder and step inside")],
+       ["echo \"# My site\" > README.md",L("Первый файл","Birinchi fayl","Файли аввал","First file")],
+       ["git init",L("Начать альбом","Albomni boshlash","Албомро оғоз кардан","Start the album")],
+       ["git add .",L("Добавить всё","Hammasini qo'shish","Ҳамаро илова кардан","Add everything")],
+       ["git commit -m \"First commit\"",L("Первое фото","Birinchi surat","Акси аввал","First photo")],
+       ["git remote add origin git@github.com:USERNAME/my-site.git",L("Записать адрес склада (замени USERNAME)","Ombor manzilini yozish (USERNAME'ni almashtiring)","Суроғаи анборро сабт кардан (USERNAME-ро иваз кунед)","Write down the warehouse address (replace USERNAME)")],
+       ["git branch -M main",L("Главная ветка — main","Asosiy shoxcha — main","Шохаи асосӣ — main","Main branch is called main")],
+       ["git push -u origin main",L("Отправить на GitHub!","GitHub'ga yuborish!","Ба GitHub фиристодан!","Send it to GitHub!")]],
+ note:L("Если адрес начинается с https://, GitHub попросит не пароль, а токен (Settings → Developer settings → Personal access tokens). Проще: настроить SSH-ключ из комнаты 08 или выполнить gh auth login.",
+        "Agar manzil https:// bilan boshlansa, GitHub parol emas, token so'raydi (Settings → Developer settings → Personal access tokens). Osonroq yo'li: 08-xonadagi SSH kalitni sozlang yoki gh auth login buyrug'ini bajaring.",
+        "Агар суроға бо https:// оғоз шавад, GitHub на парол, балки токен мепурсад (Settings → Developer settings → Personal access tokens). Осонтар: калиди SSH-ро аз утоқи 08 танзим кунед ё gh auth login-ро иҷро кунед.",
+        "If the address starts with https://, GitHub asks for a token, not your password (Settings → Developer settings → Personal access tokens). Easier: set up the SSH key from room 08, or run gh auth login."),
+ quiz:{q:L("Что делает git push?","git push nima qiladi?","git push чӣ мекунад?","What does git push do?"),
+       o:L(["Отправляет твои коммиты на GitHub","Удаляет репозиторий","Скачивает с GitHub"],["Commit'laringizni GitHub'ga yuboradi","Repozitoriyni o'chiradi","GitHub'dan yuklab oladi"],["Commit-ҳои шуморо ба GitHub мефиристад","Репозиторийро нест мекунад","Аз GitHub зеркашӣ мекунад"],["Sends your commits to GitHub","Deletes the repository","Downloads from GitHub"])}}
+];
+
+/* ---------- state ---------- */
+const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+let lang=store.get("itk-lang","uz"); if(!LANGS.some(l=>l[0]===lang)) lang="uz";
+let done=new Set(); try{done=new Set(JSON.parse(store.get("itk-done","[]")))}catch(e){}
+const t=o=>o[lang]!=null?o[lang]:o.en;
+const pad2=n=>String(n).padStart(2,"0");
+const esc=s=>String(s).replace(/[&<>\x22]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const coarse=matchMedia("(pointer: coarse)").matches;
+const WING_HEX={net:0x4ea8ff,linux:0xf4b43c,git:0xff6b4a};
+const WING_CSS={net:"#4ea8ff",linux:"#f4b43c",git:"#ff6b4a"};
+
+/* ---------- three setup ---------- */
+const canvas=document.getElementById("scene");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x0b0d12);
+scene.fog=new THREE.Fog(0x0b0d12,9,40);
+const camera=new THREE.PerspectiveCamera(70,1,0.05,100);
+camera.rotation.order="YXZ";
+scene.add(new THREE.HemisphereLight(0xc8d6ff,0x1a1a26,0.5));
+
+const CW=6,CH=3.6,Z0=3,ZEND=-37,RD=5,RW=5,DW=1.6,DH=2.6;
+const roomZ=i=>-(6+i*3), roomSide=i=>i%2===0?-1:1;
+const std=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.85,metalness:.05},o));
+const glow=(c,e=.4)=>new THREE.MeshStandardMaterial({color:c,emissive:c,emissiveIntensity:e,roughness:.4,metalness:.2});
+const basic=c=>new THREE.MeshBasicMaterial({color:c});
+function add(geo,mat,x=0,y=0,z=0,parent=scene){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);parent.add(m);return m}
+
+function tileTexture(base,lineC){const c=document.createElement("canvas");c.width=c.height=128;const g=c.getContext("2d");
+  g.fillStyle=base;g.fillRect(0,0,128,128);g.strokeStyle=lineC;g.lineWidth=3;g.strokeRect(0,0,128,128);
+  const tx=new THREE.CanvasTexture(c);tx.wrapS=tx.wrapT=THREE.RepeatWrapping;return tx}
+
+/* labels (canvas textures that re-draw on language change) */
+const labels=[];
+function label(w,h,pw,ph,draw){const c=document.createElement("canvas");c.width=pw;c.height=ph;const g=c.getContext("2d");
+  const tex=new THREE.CanvasTexture(c);tex.anisotropy=4;
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:tex,transparent:true}));
+  const L={c,g,tex,draw,mesh};labels.push(L);redraw(L);return mesh}
+function redraw(L){L.g.clearRect(0,0,L.c.width,L.c.height);L.draw(L.g,L.c.width,L.c.height);L.tex.needsUpdate=true}
+function fitText(g,text,maxW,size,weight,family){let s=size;do{g.font=`${weight} ${s}px ${family}`;s-=2}while(g.measureText(text).width>maxW&&s>10);}
+function rrect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath()}
+const FD='"Unbounded","Rubik",sans-serif',FB='"Rubik",sans-serif',FM='"JetBrains Mono",monospace';
+
+/* corridor shell */
+const LEN=Z0-ZEND, ZMID=(Z0+ZEND)/2;
+const floorTex=tileTexture("#1a1e29","#232836");floorTex.repeat.set(CW/1.5,LEN/1.5);
+const floor=add(new THREE.PlaneGeometry(CW,LEN),std(0xffffff,{map:floorTex,roughness:.55}),0,0,ZMID);floor.rotation.x=-Math.PI/2;
+const ceil=add(new THREE.PlaneGeometry(CW,LEN),std(0x12151d),0,CH,ZMID);ceil.rotation.x=Math.PI/2;
+const endWall=add(new THREE.PlaneGeometry(CW,CH),std(0x232838),0,CH/2,ZEND);
+const startWall=add(new THREE.PlaneGeometry(CW,CH),std(0x232838),0,CH/2,Z0);startWall.rotation.y=Math.PI;
+const wallMat=std(0x252b3a);
+
+// wing guide strips on the floor
+[["net",Z0,-16.5],["linux",-16.5,-28.5],["git",-28.5,ZEND]].forEach(([w,a,b])=>{
+  const s=add(new THREE.PlaneGeometry(.08,a-b),basic(WING_HEX[w]),0,.006,(a+b)/2);s.rotation.x=-Math.PI/2;
+  [-1,1].forEach(sd=>{const e=add(new THREE.PlaneGeometry(.03,a-b),basic(WING_HEX[w]),sd*(CW/2-.12),.006,(a+b)/2);e.rotation.x=-Math.PI/2;e.material=new THREE.MeshBasicMaterial({color:WING_HEX[w],transparent:true,opacity:.45})});
+});
+
+// corridor lights
+[-1,-11,-21,-31].forEach(z=>{const p=new THREE.PointLight(0xfff0dc,.9,15,2);p.position.set(0,CH-.25,z);scene.add(p);
+  add(new THREE.BoxGeometry(.5,.04,2.6),basic(0xfff4e6),0,CH-.02,z)});
+
+// side walls with door openings
+function buildSide(side){
+  const zs=ROOMS.map((_,i)=>i).filter(i=>roomSide(i)===side).map(roomZ);
+  let cur=Z0;const x=side*CW/2;
+  zs.forEach(zc=>{const a=cur,b=zc+DW/2;add(new THREE.BoxGeometry(.12,CH,a-b),wallMat,x,CH/2,(a+b)/2);
+    add(new THREE.BoxGeometry(.12,CH-DH,DW),wallMat,x,DH+(CH-DH)/2,zc);cur=zc-DW/2});
+  add(new THREE.BoxGeometry(.12,CH,cur-ZEND),wallMat,x,CH/2,(cur+ZEND)/2);
+  // baseboard
+  add(new THREE.BoxGeometry(.04,.12,LEN),std(0x1a1e28),x-side*.07,.06,ZMID);
+}
+buildSide(-1);buildSide(1);
+
+/* rooms, doors, props */
+const doors=[],props=[],clickables=[],doorLabels=[];
+function buildRooms(){ROOMS.forEach((r,i)=>{
+  const s=roomSide(i),zc=roomZ(i),col=WING_HEX[r.wing],css=WING_CSS[r.wing];
+  const face=-s*Math.PI/2; // rotation.y so a plane faces the corridor (+x for left side)
+  // glowing door frame
+  const fm=basic(col);
+  add(new THREE.BoxGeometry(.05,DH,.06),fm,s*(CW/2-.07),DH/2,zc+DW/2+.03);
+  add(new THREE.BoxGeometry(.05,DH,.06),fm,s*(CW/2-.07),DH/2,zc-DW/2-.03);
+  add(new THREE.BoxGeometry(.05,.06,DW+.12),fm,s*(CW/2-.07),DH+.03,zc);
+  // door on a hinge
+  const pivot=new THREE.Group();pivot.position.set(s*CW/2,0,zc+DW/2);scene.add(pivot);
+  const door=add(new THREE.BoxGeometry(.06,DH,DW-.02),std(0x343b4d,{roughness:.6}),0,DH/2,-DW/2,pivot);
+  door.userData.room=i;clickables.push(door);
+  const num=label(.9,.9,256,256,(g,w,h)=>{
+    rrect(g,8,8,w-16,h-16,28);g.fillStyle="#141824";g.fill();g.lineWidth=6;g.strokeStyle=css;g.stroke();
+    g.fillStyle=css;g.font=`700 120px ${FD}`;g.textAlign="center";g.textBaseline="middle";g.fillText(pad2(i+1),w/2,h/2-6);
+    if(done.has(i)){g.fillStyle="#4fd18b";g.beginPath();g.arc(w-46,46,24,0,7);g.fill();g.strokeStyle="#0b0d12";g.lineWidth=6;g.beginPath();g.moveTo(w-58,46);g.lineTo(w-49,56);g.lineTo(w-33,36);g.stroke()}
+  });
+  num.position.set(-s*.035,1.65,-DW/2);num.rotation.y=face;pivot.add(num);num.userData.room=i;clickables.push(num);doorLabels.push(num);
+  const handle=add(new THREE.SphereGeometry(.05,12,8),glow(0xdddddd,.2),-s*.06,1.1,-DW+.18,pivot);
+  doors.push({pivot,angle:0,target:0,open:-s*1.55});
+  // sign over the door
+  const sign=label(2.3,.56,1024,250,(g,w,h)=>{
+    rrect(g,4,4,w-8,h-8,22);g.fillStyle="#10131b";g.fill();
+    g.fillStyle=css;g.font=`700 92px ${FD}`;g.textBaseline="middle";g.textAlign="left";g.fillText(pad2(i+1),36,h/2+4);
+    g.fillStyle="#eef1f6";fitText(g,t(r.title),w-230,78,600,FB);g.fillText(t(r.title),200,h/2+4);
+  });
+  sign.position.set(s*(CW/2-.075),DH+.47,zc);sign.rotation.y=face;scene.add(sign);sign.userData.room=i;clickables.push(sign);
+  // room box (5 planes)
+  const cx=s*(CW/2+RD/2);
+  const rwall=std(new THREE.Color(0x232836).lerp(new THREE.Color(col),.08));
+  const rf=add(new THREE.PlaneGeometry(RD,RW),std(0xffffff,{map:floorTex.clone(),roughness:.55}),cx,0,zc);rf.rotation.x=-Math.PI/2;
+  rf.material.map.repeat.set(RD/1.5,RW/1.5);rf.material.map.needsUpdate=true;
+  const rc=add(new THREE.PlaneGeometry(RD,RW),std(0x12151d),cx,CH,zc);rc.rotation.x=Math.PI/2;
+  const back=add(new THREE.PlaneGeometry(RW,CH),rwall,s*(CW/2+RD),CH/2,zc);back.rotation.y=face;
+  const w1=add(new THREE.PlaneGeometry(RD,CH),rwall,cx,CH/2,zc+RW/2);w1.rotation.y=Math.PI;
+  add(new THREE.PlaneGeometry(RD,CH),rwall,cx,CH/2,zc-RW/2);
+  const lamp=new THREE.PointLight(col,1.5,9,2);lamp.position.set(cx,CH-.4,zc);scene.add(lamp);
+  add(new THREE.BoxGeometry(1.4,.04,1.4),basic(col),cx,CH-.02,zc);
+  // title on back wall
+  const bt=label(3.8,.8,1200,252,(g,w,h)=>{g.fillStyle=css;g.font=`500 40px ${FB}`;g.textAlign="center";g.textBaseline="top";
+    g.fillText(`${t(UI.room).toUpperCase()} ${pad2(i+1)} · ${t(UI.wings[r.wing]).toUpperCase()}`,w/2,14);
+    g.fillStyle="#eef1f6";fitText(g,t(r.title),w-60,96,700,FD);g.fillText(t(r.title),w/2,90)});
+  bt.position.set(s*(CW/2+RD-.02),2.9,zc);bt.rotation.y=face;scene.add(bt);
+  // prop
+  const holder=new THREE.Group();holder.position.set(cx,1.35,zc);holder.rotation.y=face;scene.add(holder);
+  const p=PROPS[r.prop](col);holder.add(p.g);props.push(p);
+});}
+
+// hanging wing signs + finale
+function wingSign(w,z){const mk=()=>label(3.4,.62,1100,200,(g,W,H)=>{rrect(g,4,4,W-8,H-8,26);g.fillStyle="rgba(16,19,27,.92)";g.fill();
+    g.lineWidth=5;g.strokeStyle=WING_CSS[w];g.stroke();g.fillStyle=WING_CSS[w];g.beginPath();g.arc(70,H/2,18,0,7);g.fill();
+    g.fillStyle="#eef1f6";fitText(g,t(UI.wings[w]).toUpperCase(),W-160,84,700,FD);g.textBaseline="middle";g.fillText(t(UI.wings[w]).toUpperCase(),112,H/2+4)});
+  const a=mk();a.position.set(0,3.05,z);scene.add(a);const b=mk();b.position.set(0,3.05,z-.01);b.rotation.y=Math.PI;scene.add(b);
+  add(new THREE.CylinderGeometry(.01,.01,.25),basic(0x555c70),-1.2,3.45,z);add(new THREE.CylinderGeometry(.01,.01,.25),basic(0x555c70),1.2,3.45,z)}
+wingSign("net",-2.6);wingSign("linux",-16.6);wingSign("git",-28.6);
+const fin=label(4.6,1.5,1400,456,(g,w,h)=>{g.textAlign="center";g.fillStyle="#ff6b4a";g.font=`500 54px ${FB}`;g.fillText(t(UI.finale),w/2,90);
+  g.fillStyle="#eef1f6";g.font=`600 96px ${FM}`;g.fillText("$ git push -u origin main",w/2,240);
+  g.fillStyle="#9aa4b8";g.font=`400 50px ${FM}`;g.fillText("→ github.com",w/2,350)});
+fin.position.set(0,2.1,ZEND+.02);scene.add(fin);
+const finLight=new THREE.PointLight(0xff6b4a,1.2,8,2);finLight.position.set(0,2.4,ZEND+2);scene.add(finLight);
+
+/* ---------- props ---------- */
+function line(a,b,col,op=1){return new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:col,transparent:op<1,opacity:op}))}
+var PROPS={
+  network(col){const g=new THREE.Group();const hub=add(new THREE.SphereGeometry(.2,24,16),glow(col,.9),0,0,0,g);const nodes=[];
+    for(let k=0;k<6;k++){const a=k/6*Math.PI*2,p=new THREE.Vector3(Math.cos(a)*.9,Math.sin(a*2)*.22,Math.sin(a)*.9);
+      add(new THREE.BoxGeometry(.24,.2,.24),glow(0xdde6f5,.12),p.x,p.y,p.z,g);g.add(line(new THREE.Vector3(),p,col,.7));
+      const pk=add(new THREE.SphereGeometry(.04,8,6),basic(0xffffff),0,0,0,g);nodes.push({p,pk,o:k/6})}
+    return{g,update(t){g.rotation.y=t*.25;hub.scale.setScalar(1+Math.sin(t*3)*.07);nodes.forEach(n=>{const f=(t*.5+n.o)%1;n.pk.position.copy(n.p).multiplyScalar(f)})}}},
+  router(col){const g=new THREE.Group();add(new THREE.BoxGeometry(1.1,.22,.6),std(0x2b3142,{roughness:.4}),0,-.35,0,g);
+    [-.4,.4].forEach(x=>{const a=add(new THREE.CylinderGeometry(.025,.025,.6),std(0x2b3142),x,-.05,-.25,g);a.rotation.z=x*.4});
+    const leds=[0,1,2,3].map(k=>add(new THREE.SphereGeometry(.035,8,6),glow(col,1),-.3+k*.2,-.35,.31,g));
+    const book=new THREE.Group();g.add(book);book.position.y=.45;add(new THREE.BoxGeometry(.6,.08,.44),glow(0xeef1f6,.15),0,0,0,book);add(new THREE.BoxGeometry(.62,.1,.05),glow(col,.6),0,0,-.21,book);
+    return{g,update(t){leds.forEach((l,k)=>l.material.emissiveIntensity=(Math.sin(t*6+k*1.7)>0)?1.2:.1);book.rotation.y=t*.6;book.position.y=.45+Math.sin(t*1.5)*.06}}},
+  ports(col){const g=new THREE.Group();add(new THREE.BoxGeometry(1.5,1.1,.08),std(0x1c2130),0,0,-.06,g);const cells=[];
+    for(let r=0;r<3;r++)for(let c=0;c<4;c++){cells.push(add(new THREE.BoxGeometry(.26,.26,.06),glow(0x3a4256,.1),-.54+c*.36,.36-r*.36,0,g))}
+    return{g,update(t){const on=Math.floor(t*1.2)%cells.length;cells.forEach((c,k)=>{c.material.color.setHex(k===on?col:0x3a4256);c.material.emissive.setHex(k===on?col:0x3a4256);c.material.emissiveIntensity=k===on?.9:.08;c.position.z=k===on?.08:0})}}},
+  ping(col){const g=new THREE.Group();add(new THREE.BoxGeometry(.4,.3,.3),glow(0xdde6f5,.12),-.85,0,0,g);add(new THREE.SphereGeometry(.2,20,14),glow(col,.6),.85,0,0,g);
+    g.add(line(new THREE.Vector3(-.65,0,0),new THREE.Vector3(.65,0,0),col,.35));const pk=add(new THREE.SphereGeometry(.07,12,8),basic(0xffffff),0,0,0,g);
+    const ring=add(new THREE.TorusGeometry(.25,.012,8,40),basic(col),.85,0,0,g);ring.rotation.y=Math.PI/2;
+    return{g,update(t){pk.position.x=Math.sin(t*2.2)*.65;const f=(t*.9)%1;ring.scale.setScalar(1+f*1.4);ring.material.transparent=true;ring.material.opacity=1-f}}},
+  terminal(col){const g=new THREE.Group();add(new THREE.BoxGeometry(2.1,1.3,.08),std(0x0d0f15,{roughness:.3}),0,.1,-.05,g);add(new THREE.BoxGeometry(.1,.7,.1),std(0x2b3142),0,-.8,-.08,g);
+    let cursor=true;const scr=label(1.96,1.16,840,500,(c,w,h)=>{c.fillStyle="#07090d";c.fillRect(0,0,w,h);c.font=`500 34px ${FM}`;c.textBaseline="top";
+      const lines=[["$ whoami",1],["ali",0],["$ pwd",1],["/home/ali",0],["$ ls",1],["Documents  project  notes.txt",0]];
+      lines.forEach(([s,p],k)=>{c.fillStyle=p?"#f4b43c":"#cfd6e2";c.fillText(s,28,26+k*62)});c.fillStyle="#f4b43c";c.fillText("$",28,26+6*62);if(cursor){c.fillRect(64,30+6*62,20,34)}});
+    scr.position.set(0,.1,.0);g.add(scr);const Lb=labels[labels.length-1];
+    return{g,update(t){const c=Math.floor(t*2)%2===0;if(c!==cursor){cursor=c;redraw(Lb)}}}},
+  tree(col){const g=new THREE.Group();const fm=glow(col,.35);const pts=[[0,.65],[-.6,0],[.6,0],[-.9,-.65],[-.3,-.65],[.6,-.65]],edges=[[0,1],[0,2],[1,3],[1,4],[2,5]];
+    pts.forEach(([x,y])=>{add(new THREE.BoxGeometry(.34,.24,.08),fm,x,y,0,g);add(new THREE.BoxGeometry(.14,.06,.08),fm,x-.1,y+.14,0,g)});
+    edges.forEach(([a,b])=>g.add(line(new THREE.Vector3(pts[a][0],pts[a][1]-.12,0),new THREE.Vector3(pts[b][0],pts[b][1]+.12,0),0xeef1f6,.5)));
+    const me=add(new THREE.SphereGeometry(.07,12,8),basic(0xffffff),0,0,.12,g);const path=[0,1,4,1,0,2,5,2];
+    return{g,update(t){g.position.y=Math.sin(t)*.04;const f=t*.6,k=Math.floor(f)%path.length,n=(k+1)%path.length,u=f%1;const A=pts[path[k]],B=pts[path[n]];me.position.set(A[0]+(B[0]-A[0])*u,A[1]+(B[1]-A[1])*u,.12)}}},
+  lock(col){const g=new THREE.Group();add(new THREE.BoxGeometry(.8,.66,.3),glow(col,.35),0,-.2,0,g);
+    const sh=new THREE.Mesh(new THREE.TorusGeometry(.26,.06,12,30,Math.PI),std(0xc9cfdb,{metalness:.7,roughness:.3}));sh.position.y=.13;g.add(sh);
+    add(new THREE.CylinderGeometry(.06,.06,.32,16),basic(0x0b0d12),0,-.15,.01,g).rotation.x=Math.PI/2;
+    const txt=label(1.2,.3,480,120,(c,w,h)=>{c.fillStyle="#eef1f6";c.font=`600 64px ${FM}`;c.textAlign="center";c.textBaseline="middle";c.fillText("rwx r-x ---",w/2,h/2)});txt.position.set(0,-.78,.0);g.add(txt);
+    return{g,update(t){const k=(Math.sin(t*1.3)+1)/2;sh.position.y=.13+k*.12;g.rotation.y=Math.sin(t*.7)*.35}}},
+  key(col){const g=new THREE.Group();const km=std(0xe8c46a,{metalness:.75,roughness:.25,emissive:0x3a2a00});const inner=new THREE.Group();g.add(inner);
+    add(new THREE.TorusGeometry(.22,.07,12,30),km,-.55,0,0,inner);const sh=add(new THREE.CylinderGeometry(.05,.05,.9,12),km,.1,0,0,inner);sh.rotation.z=Math.PI/2;
+    add(new THREE.BoxGeometry(.06,.16,.06),km,.4,-.1,0,inner);add(new THREE.BoxGeometry(.06,.22,.06),km,.5,-.12,0,inner);
+    const pub=add(new THREE.BoxGeometry(.36,.3,.16),glow(col,.4),0,-.62,0,g);
+    return{g,update(t){inner.rotation.x=t*.9;inner.position.y=.15+Math.sin(t*1.4)*.05;pub.rotation.y=t*.5}}},
+  commits(col){const g=new THREE.Group();const main=[-1,-.5,0,.5,1].map(x=>new THREE.Vector3(x,-.2,0));const br=[new THREE.Vector3(-.25,.35,0),new THREE.Vector3(.25,.35,0)];
+    const balls=main.map(p=>add(new THREE.SphereGeometry(.11,16,12),glow(col,.4),p.x,p.y,p.z,g));br.forEach(p=>add(new THREE.SphereGeometry(.1,16,12),glow(0x4ea8ff,.4),p.x,p.y,p.z,g));
+    for(let k=0;k<4;k++)g.add(line(main[k],main[k+1],0xeef1f6,.5));g.add(line(main[1],br[0],0x4ea8ff,.6));g.add(line(br[0],br[1],0x4ea8ff,.6));g.add(line(br[1],main[3],0x4ea8ff,.6));
+    return{g,update(t){balls.forEach((b,k)=>b.material.emissiveIntensity=k===4?.6+Math.sin(t*4)*.5:.3);g.rotation.y=Math.sin(t*.5)*.25}}},
+  cloud(col){const g=new THREE.Group();const cm=glow(0xeef1f6,.25);[[0,.6,0,.28],[-.3,.55,0,.2],[.3,.55,0,.22],[-.12,.75,0,.2],[.15,.78,0,.18]].forEach(([x,y,z,r])=>add(new THREE.SphereGeometry(r,20,14),cm,x,y,z,g));
+    add(new THREE.BoxGeometry(.7,.04,.46),std(0x2b3142),0,-.62,.1,g);const lid=add(new THREE.BoxGeometry(.7,.44,.03),glow(col,.35),0,-.4,-.12,g);lid.rotation.x=-.2;
+    const pk=[0,1,2].map(k=>add(new THREE.BoxGeometry(.08,.08,.08),basic(col),0,0,0,g));
+    return{g,update(t){pk.forEach((p,k)=>{const f=(t*.5+k/3)%1;p.position.set(Math.sin(f*6+k)*.05,-.35+f*.85,0);p.scale.setScalar(1-f*.5)});g.position.y=Math.sin(t)*.03}}}
+};
+
+buildRooms();
+
+/* ---------- camera / movement ---------- */
+const cam={x:0,z:1.6,yaw:0,pitch:-.02};
+let mode="intro",current=null,busy=false,tween=null,viewK=0,nearDoor=null;
+const keys=new Set();
+function tweenTo(to,dur){return new Promise(res=>{const from={...cam};let dy=to.yaw-from.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));
+  tween={from,to:{...to,yaw:from.yaw+dy},dur:reduce?Math.min(dur,.12):dur,t:0,res}})}
+const wait=ms=>new Promise(r=>setTimeout(r,reduce?0:ms));
+const ease=k=>k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+const faceYaw=s=>s<0?Math.PI/2:-Math.PI/2;
+
+async function walkToDoor(i){const s=roomSide(i),zc=roomZ(i);const tx=s*1.0;const dx=tx-cam.x,dz=zc-cam.z,d=Math.hypot(dx,dz);
+  if(d>1.2){await tweenTo({x:cam.x,z:cam.z,yaw:Math.atan2(-dx,-dz),pitch:0},.3);await tweenTo({x:tx,z:zc,yaw:Math.atan2(-dx,-dz),pitch:0},.35+d*.085)}
+  await tweenTo({x:tx,z:zc,yaw:faceYaw(s),pitch:0},.4)}
+async function enterRoom(i){if(busy)return;busy=true;hideIntro();setHint(null);
+  if(mode==="room"&&current!==null){if(current===i){busy=false;return}closePanel();await leaveRoom(false)}
+  mode="moving";markRail(i);await walkToDoor(i);doors[i].target=doors[i].open;await wait(380);
+  const s=roomSide(i);await tweenTo({x:s*(CW/2+.55),z:roomZ(i),yaw:faceYaw(s),pitch:-.07},.9);
+  mode="room";current=i;openPanel(i);busy=false}
+async function leaveRoom(turn=true){const i=current,s=roomSide(i);mode="moving";
+  await tweenTo({x:s*1.0,z:roomZ(i),yaw:faceYaw(s),pitch:0},.8);doors[i].target=0;current=null;
+  if(turn)await tweenTo({x:s*.6,z:roomZ(i),yaw:0,pitch:-.02},.5);mode="corridor";markRail(null)}
+async function exitRoom(){if(busy||mode!=="room")return;busy=true;closePanel();await leaveRoom(true);busy=false}
+
+/* input */
+addEventListener("keydown",e=>{if(e.target.closest&&e.target.closest("input,textarea"))return;const k=e.key.toLowerCase();
+  if(mode==="intro"&&(k==="enter")){startWalk();return}
+  if(["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"].includes(k)){keys.add(k);if(k.startsWith("arrow")&&mode==="corridor")e.preventDefault()}
+  if(k==="e"&&mode==="corridor"&&nearDoor!=null)enterRoom(nearDoor);
+  if(k==="escape"&&mode==="room")exitRoom()});
+addEventListener("keyup",e=>keys.delete(e.key.toLowerCase()));
+addEventListener("blur",()=>keys.clear());
+let drag=null;const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();
+canvas.addEventListener("pointerdown",e=>{drag={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,moved:false};canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener("pointermove",e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
+  if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>6)drag.moved=true;
+  if(!tween&&(mode==="corridor"||mode==="room")){cam.yaw+=dx*.005;cam.pitch=Math.max(-.9,Math.min(.9,cam.pitch+dy*.004))}});
+canvas.addEventListener("pointerup",e=>{if(drag&&!drag.moved)clickAt(e.clientX,e.clientY);drag=null});
+canvas.addEventListener("pointercancel",()=>drag=null);
+function clickAt(x,y){if(mode==="intro"){startWalk();return}if(mode!=="corridor")return;const r=canvas.getBoundingClientRect();
+  ndc.set((x-r.left)/r.width*2-1,-(y-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);
+  const hit=ray.intersectObjects(clickables,false)[0];if(hit&&hit.distance<24)enterRoom(hit.object.userData.room)}
+function hold(btn,key){const on=e=>{e.preventDefault();keys.add(key)},off=()=>keys.delete(key);
+  btn.addEventListener("pointerdown",on);["pointerup","pointerleave","pointercancel"].forEach(ev=>btn.addEventListener(ev,off))}
+hold(document.getElementById("padF"),"w");hold(document.getElementById("padB"),"s");
+
+/* ---------- UI ---------- */
+const $=id=>document.getElementById(id);
+const panel=$("panel"),pin=$("pin"),hint=$("hint"),toast=$("toast");
+function langButtons(el){el.innerHTML=LANGS.map(([c,l])=>`<button data-l="${c}" aria-pressed="${c===lang}">${l}</button>`).join("");
+  el.onclick=e=>{const b=e.target.closest("button");if(b)setLang(b.dataset.l)}}
+function setLang(l){lang=l;store.set("itk-lang",l);document.documentElement.lang=l==="tg"?"tg":l;renderStatic();labels.forEach(redraw);if(mode==="room"&&current!=null)renderPanel(current,true)}
+function renderStatic(){langButtons($("langTop"));langButtons($("langIntro"));
+  $("introSub").textContent=t(UI.sub);$("enterBtn").textContent=t(UI.enter);$("ctrlTxt").textContent=t(coarse?UI.ctrlTouch:UI.ctrlDesk);
+  $("route").innerHTML=["net","linux","git"].map(w=>`<span style="--c:${WING_CSS[w]}"><i></i>${esc(t(UI.wings[w]))}</span>`).join("<b>→</b>");
+  renderRail();if(nearDoor!=null)setHint(nearDoor,true)}
+function renderRail(){const groups={net:[],linux:[],git:[]};ROOMS.forEach((r,i)=>groups[r.wing].push(i));
+  $("rail").innerHTML=Object.entries(groups).map(([w,ids])=>`<div class="wgroup"><span>${esc(t(UI.wings[w]))}</span><div>${ids.map(i=>
+    `<button class="chip${done.has(i)?" done":""}${current===i?" here":""}" style="--c:${WING_CSS[w]}" data-i="${i}" title="${esc(t(ROOMS[i].title))}" aria-label="${esc(t(UI.room)+" "+(i+1)+": "+t(ROOMS[i].title))}">${done.has(i)?"✓":pad2(i+1)}</button>`).join("")}</div></div>`).join("");
+  $("barFill").style.width=(done.size/ROOMS.length*100)+"%";$("progTxt").textContent=`${done.size}/${ROOMS.length}`}
+$("rail").addEventListener("click",e=>{const b=e.target.closest(".chip");if(b)enterRoom(+b.dataset.i)});
+function markRail(i){document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("here",+c.dataset.i===i))}
+
+function renderPanel(i,keepScroll){const r=ROOMS[i];const css=WING_CSS[r.wing];panel.style.setProperty("--wing",css);document.documentElement.style.setProperty("--wing",css);
+  const order=[0,1,2].map(k=>(k+i)%3);const st=panel.scrollTop;
+  pin.innerHTML=`
+  <div><button class="close" id="xBtn" aria-label="${esc(t(UI.back))}">✕</button>
+    <div class="eyebrow">${esc(t(UI.room))} ${pad2(i+1)} · ${esc(t(UI.wings[r.wing]))}</div><h2>${esc(t(r.title))}</h2></div>
+  <section class="sec story"><h3>${esc(t(UI.story))}</h3><p>${esc(t(r.story))}</p></section>
+  <section class="sec"><h3>${esc(t(UI.points))}</h3><ul class="pts">${t(r.points).map(p=>`<li>${esc(p)}</li>`).join("")}</ul></section>
+  <section class="sec"><h3>${esc(t(UI.cmds))}</h3><div class="cmds">${r.cmds.map(([c,d],k)=>`<div class="cmd"><code><b>$ </b>${esc(c)}</code><button class="copy" data-k="${k}">${esc(t(UI.copy))}</button><small>${esc(t(d))}</small></div>`).join("")}</div></section>
+  ${r.note?`<div class="note">${esc(t(r.note))}</div>`:""}
+  <section class="sec quiz"><h3>${esc(t(UI.quiz))}</h3><p>${esc(t(r.quiz.q))}</p><div class="opts">${order.map(k=>`<button class="opt" data-k="${k}">${esc(t(r.quiz.o)[k])}</button>`).join("")}</div>
+    <div class="verdict${done.has(i)?" ok":""}" id="verdict">${done.has(i)?esc(t(UI.right)):""}</div></section>
+  <div class="nav"><button class="btn" id="backBtn">${esc(t(UI.back))}</button>${i<ROOMS.length-1?`<button class="btn primary" id="nextBtn">${esc(t(UI.next))}</button>`:""}</div>`;
+  if(keepScroll)panel.scrollTop=st;else panel.scrollTop=0;
+  $("xBtn").onclick=exitRoom;$("backBtn").onclick=exitRoom;if($("nextBtn"))$("nextBtn").onclick=()=>enterRoom(i+1);
+  pin.querySelectorAll(".copy").forEach(b=>b.onclick=()=>{const txt=r.cmds[+b.dataset.k][0];const ok=()=>{b.textContent=t(UI.copied);setTimeout(()=>b.textContent=t(UI.copy),1400)};
+    try{navigator.clipboard.writeText(txt).then(ok,()=>selectCode(b))}catch(e){selectCode(b)}});
+  pin.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{const v=$("verdict");pin.querySelectorAll(".opt").forEach(o=>o.classList.remove("wrong"));
+    if(+b.dataset.k===0){b.classList.add("right");v.className="verdict ok";v.textContent=t(UI.right);
+      if(!done.has(i)){done.add(i);store.set("itk-done",JSON.stringify([...done]));redraw(labels[labels.indexOf(labels.find(L=>L.mesh===doorLabels[i]))]);renderRail();markRail(i);
+        if(done.size===ROOMS.length)showToast(t(UI.finish),5000)}}
+    else{b.classList.add("wrong");v.className="verdict no";v.textContent=t(UI.wrong)}})}
+function selectCode(b){const code=b.previousElementSibling;const rg=document.createRange();rg.selectNodeContents(code);const s=getSelection();s.removeAllRanges();s.addRange(rg)}
+function openPanel(i){renderPanel(i);panel.classList.add("open")}
+function closePanel(){panel.classList.remove("open")}
+function setHint(i,force){if(i===nearDoor&&!force)return;nearDoor=i;if(i==null){hint.hidden=true;return}
+  hint.textContent=`${pad2(i+1)} · ${t(ROOMS[i].title)} — ${t(coarse?UI.hintTouch:UI.hintDoor)}`;hint.hidden=false}
+let toastT;function showToast(msg,ms=2000){toast.textContent=msg;toast.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>toast.hidden=true,ms)}
+function hideIntro(){$("intro").hidden=true;if(mode==="intro")mode="corridor"}
+function startWalk(){if(mode!=="intro")return;hideIntro();cam.yaw=0;cam.pitch=-.02;canvas.focus&&canvas.focus()}
+$("enterBtn").onclick=startWalk;
+
+/* ---------- loop ---------- */
+function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);applyView(w,h)}
+function applyView(w=innerWidth,h=innerHeight){
+  if(viewK<.001){camera.clearViewOffset();camera.aspect=w/h;camera.updateProjectionMatrix();return}
+  const narrow=w<=720;
+  if(narrow){const S=panel.offsetHeight*.92*viewK;camera.aspect=w/(h+S);camera.setViewOffset(w,h+S,0,S,w,h)}
+  else{const P=(panel.offsetWidth+16)*viewK;camera.aspect=(w+P)/h;camera.setViewOffset(w+P,h,P,0,w,h)}
+  camera.updateProjectionMatrix()}
+addEventListener("resize",resize);
+const clock=new THREE.Clock();let T=0;
+function frame(){const dt=Math.min(clock.getDelta(),.05);T+=dt;
+  if(tween){tween.t+=dt;const k=ease(Math.min(tween.t/tween.dur,1));const{from:f,to}=tween;
+    cam.x=f.x+(to.x-f.x)*k;cam.z=f.z+(to.z-f.z)*k;cam.yaw=f.yaw+(to.yaw-f.yaw)*k;cam.pitch=f.pitch+(to.pitch-f.pitch)*k;
+    if(tween.t>=tween.dur){const r=tween.res;tween=null;r()}}
+  else if(mode==="corridor"){
+    const sp=3.2*dt,ts=1.8*dt;let fw=0,st=0;
+    if(keys.has("w")||keys.has("arrowup"))fw+=1;if(keys.has("s")||keys.has("arrowdown"))fw-=1;
+    if(keys.has("a"))st-=1;if(keys.has("d"))st+=1;
+    if(keys.has("arrowleft"))cam.yaw+=ts;if(keys.has("arrowright"))cam.yaw-=ts;
+    const sy=Math.sin(cam.yaw),cy=Math.cos(cam.yaw);
+    cam.x+=(-sy*fw+cy*st)*sp;cam.z+=(-cy*fw-sy*st)*sp;
+    cam.x=Math.max(-(CW/2-.4),Math.min(CW/2-.4,cam.x));cam.z=Math.max(ZEND+.6,Math.min(Z0-.5,cam.z));
+    let near=null,best=9;ROOMS.forEach((_,i)=>{const s=roomSide(i),dz=Math.abs(cam.z-roomZ(i));if(dz<1.3&&s*cam.x>-.4&&dz<best){best=dz;near=i}});
+    setHint(near);
+    if(near!=null&&(fw||st)){const s=roomSide(near);if(s*cam.x>CW/2-.55&&Math.abs(cam.z-roomZ(near))<DW/2-.15)enterRoom(near)}
+  } else if(mode==="intro"){cam.yaw=Math.sin(T*.25)*.35;cam.z=1.6}
+  if(mode!=="corridor"&&nearDoor!=null)setHint(null);
+  camera.position.set(cam.x,1.62+(mode==="corridor"&&(keys.size)?Math.sin(T*9)*.02:0),cam.z);
+  camera.rotation.y=cam.yaw;camera.rotation.x=cam.pitch;
+  doors.forEach(d=>{d.angle+=(d.target-d.angle)*Math.min(1,dt*5);d.pivot.rotation.y=d.angle});
+  const vt=panel.classList.contains("open")?1:0;const nv=viewK+(vt-viewK)*Math.min(1,dt*4);if(Math.abs(nv-viewK)>1e-4||(vt===0&&viewK!==0&&nv<.001)){viewK=nv<.001?0:nv;applyView()}
+  props.forEach(p=>p.update(reduce?T*.2:T));
+  renderer.render(scene,camera);requestAnimationFrame(frame)}
+
+renderStatic();resize();
+if(document.fonts&&document.fonts.load){Promise.all([document.fonts.load(`700 40px Unbounded`),document.fonts.load(`600 40px Rubik`),document.fonts.load(`500 40px Rubik`),document.fonts.load(`600 40px "JetBrains Mono"`)]).then(()=>labels.forEach(redraw)).catch(()=>{})}
+requestAnimationFrame(frame);
+</script>
+
+</body>
+</html>
